@@ -1,0 +1,4 @@
+db_host: 192.168.178.111
+db_name: bird
+db_user: flask
+pg_allowed_net: 192.168.178.0/24

@@ -1,0 +1,123 @@
+---
+- name: Update db servers
+  hosts: db
+  become: true
+
+  tasks:
+    - name: Ensure PostgreSQL and psycopg2 are installed
+      ansible.builtin.apt:
+        name:
+          - postgresql
+          - postgresql-contrib
+          - python3-psycopg2
+          - acl
+        state: present
+        update_cache: true
+
+    - name: Ensure PostgreSQL is running and enabled
+      ansible.builtin.systemd:
+        name: postgresql
+        state: started
+        enabled: true
+
+    - block:
+        - name: Create DB user with password
+          community.postgresql.postgresql_user:
+            name: "{{ db_user }}"
+            password: "{{ db_password }}"
+            state: present
+            login_user: postgres
+
+        - name: Create database owned by the user
+          community.postgresql.postgresql_db:
+            name: "{{ db_name }}"
+            owner: "{{ db_user }}"
+            state: present
+            login_user: postgres
+
+        - name: Grant ALL privileges on DB to user
+          community.postgresql.postgresql_privs:
+            database: "{{ db_name }}"
+            roles: "{{ db_user }}"
+            type: database
+            privs: ALL
+            state: present
+            login_user: postgres
+
+        - name: Grant usage and create on schema public
+          community.postgresql.postgresql_privs:
+            db: "{{ db_name }}"
+            roles: "{{ db_user }}"
+            type: schema
+            objs: public
+            privs: USAGE,CREATE
+            state: present
+            login_user: postgres
+
+        - name: Grant all privileges on all tables in public
+          community.postgresql.postgresql_privs:
+            db: "{{ db_name }}"
+            roles: "{{ db_user }}"
+            type: table
+            objs: ALL_IN_SCHEMA
+            schema: public
+            privs: ALL
+            state: present
+            login_user: postgres
+
+        - name: Grant USAGE/SELECT/UPDATE on all sequences in public to app user
+          community.postgresql.postgresql_privs:
+            db: "{{ db_name }}"
+            roles: "{{ db_user }}"
+            type: sequence
+            objs: ALL_IN_SCHEMA
+            schema: public
+            privs: USAGE,SELECT,UPDATE
+            state: present
+            login_user: postgres
+
+        - name: Set listen_addresses
+          community.postgresql.postgresql_alter_system:
+            param: listen_addresses
+            value: "*"
+            login_user: postgres
+          notify: Restart PostgreSQL
+      become_user: postgres
+
+    - name: Add pg_hba rule
+      community.postgresql.postgresql_pg_hba:
+        dest: "/etc/postgresql/16/main/pg_hba.conf"
+        contype: host
+        databases: all
+        users: all
+        address: "{{ pg_allowed_net }}"
+        method: scram-sha-256
+        state: present
+      notify: Restart PostgreSQL
+
+    - name: Create required tables (users, posts)
+      community.postgresql.postgresql_query:
+        db: "{{ db_name }}"
+        login_user: postgres
+        query: |
+          CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            username TEXT NOT NULL UNIQUE,
+            password TEXT NOT NULL
+          );
+
+          CREATE TABLE IF NOT EXISTS posts (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            location TEXT NOT NULL,
+            image_path TEXT NOT NULL
+          );
+      become_user: postgres
+
+  handlers:
+    - name: Restart PostgreSQL
+      ansible.builtin.systemd:
+        name: postgresql
+        state: restarted
+        

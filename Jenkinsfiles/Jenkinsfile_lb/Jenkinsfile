@@ -1,0 +1,18 @@
+pipeline {
+  agent any
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+    stage('Run Ansible') {
+      steps {
+        sh '''
+          export ANSIBLE_HOST_KEY_CHECKING=False
+          ansible-playbook -i ansible/inventory.ini ansible/lb.yml --limit load_balancer
+        '''
+      }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+upstream flask_app {
+{% for host in groups['server'] %}
+    server {{ host }};
+{% endfor %}
+}
+
+server {
+    listen 80;
+    location / {
+        proxy_pass http://flask_app;
+    }
+}

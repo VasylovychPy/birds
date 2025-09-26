@@ -1,0 +1,106 @@
+---
+- name: Update web servers
+  hosts: server
+  remote_user: vagrant
+  become: yes
+
+  tasks:
+    - name: Ensure that nginx is installed
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+        update_cache: yes
+
+    - name: Ensure Nginx is running and enabled
+      ansible.builtin.systemd:
+        name: nginx
+        state: started
+        enabled: true
+    
+    - name: Ensure uploads dir exists (mount point) and is writable
+      ansible.builtin.file:
+        path: /srv/uploads
+        state: directory
+        mode: "0775"
+
+    - name: Add app user to vagrant group (to write into /srv/uploads)
+      ansible.builtin.user:
+        name: "{{ app_user }}"
+        groups: vagrant
+        append: yes    
+
+    - name: Ensure python3 and packages are installed
+      ansible.builtin.apt:
+        name:
+          - python3
+          - python3-pip
+          - python3-flask
+          - gunicorn
+          - python3-psycopg2
+          - python3-dotenv
+        state: present
+        update_cache: yes
+
+    - name: Ensure app user exists
+      ansible.builtin.user:
+        name: "{{ app_user }}"
+        create_home: yes
+        shell: /usr/sbin/nologin
+
+    - name: Ensure app directory exists
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0755"
+    
+    - name: Copy Flask app code
+      ansible.builtin.copy:
+        src: ../flask-app/
+        dest: "{{ app_dir }}/"
+        mode: "0755"   
+
+    - name: Drop .env from template
+      ansible.builtin.template:
+        src: env.j2
+        dest: "{{ app_env_file }}"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0600"
+
+    - name: Install systemd unit from template
+      ansible.builtin.template:
+        src: flask.service.j2
+        dest: /etc/systemd/system/flask.service
+        mode: "0644"
+      notify: Reload systemd
+
+    - name: Enable & start Flask service
+      ansible.builtin.systemd:
+        name: flask
+        enabled: true
+        state: started
+
+    - name: Deploy Nginx reverse proxy config
+      ansible.builtin.template:
+        src: flask.conf.j2
+        dest: /etc/nginx/sites-enabled/flask.conf
+        mode: "0644"
+      notify: Reload nginx
+
+    - name: Remove default site
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Reload nginx
+
+  handlers:
+    - name: Reload nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: reloaded
+
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true

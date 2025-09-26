@@ -1,0 +1,10 @@
+app_user: flaskapp
+app_dir: /opt/flaskapp
+app_env_file: /opt/flaskapp/.env
+app_bind: 0.0.0.0:8000
+gunicorn_workers: 2
+app_module: app:app
+db_host: 192.168.178.111
+db_name: bird
+db_user: flask
+pg_allowed_net: 192.168.178.0/24

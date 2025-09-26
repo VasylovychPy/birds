@@ -1,0 +1,36 @@
+---
+- name: Update LB server
+  hosts: load_balancer
+  remote_user: root
+  become: yes
+  tasks:
+    - name: Ensure that nginx is installed
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+        update_cache: yes
+
+    - name: Ensure Nginx is running and enabled
+      ansible.builtin.systemd:
+        name: nginx
+        state: started
+        enabled: true
+
+    - name: Deploy Nginx load balancer config
+      ansible.builtin.template:
+        src: lb.conf.j2
+        dest: /etc/nginx/sites-enabled/lb.conf
+        mode: "0644"
+      notify: Reload nginx
+
+    - name: Remove default site
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Reload nginx
+
+  handlers:
+    - name: Reload nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: reloaded

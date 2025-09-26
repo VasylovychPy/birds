@@ -1,0 +1,25 @@
+# Vagrant / VMware
+.vagrant/
+*.vmdk
+*.nvram
+*.vmx
+*.vmxf
+*.vmsd
+vmware*.log
+**/vmware*.log
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+
+# Ansible
+*.retry
+
+# Shared uploads/images – лишаємо тільки плейсхолдер
+shared-images/*
+!shared-images/.gitignore
