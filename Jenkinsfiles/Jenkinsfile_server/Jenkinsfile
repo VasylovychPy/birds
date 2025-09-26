@@ -1,0 +1,23 @@
+pipeline {
+  agent any
+  environment {
+    DB_PASSWORD = credentials('db_password')
+  }
+  stages {
+    stage('Checkout') {
+      steps { checkout scm }
+    }
+    stage('Run Ansible') {
+      steps {
+        sshagent(credentials: ['server', 'server2']) {
+          sh '''
+            export ANSIBLE_HOST_KEY_CHECKING=False
+
+            ansible-playbook -i ansible/inventory.ini ansible/flask.yml \
+              -e db_password="$DB_PASSWORD"
+          '''
+        }
+      }
+    }
+  }
+}

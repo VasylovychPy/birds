@@ -8,10 +8,12 @@ pipeline {
     }
     stage('Run Ansible') {
       steps {
-        sh '''
-          export ANSIBLE_HOST_KEY_CHECKING=False
-          ansible-playbook -i ansible/inventory.ini ansible/lb.yml --limit load_balancer
-        '''
+        sshagent(credentials: ['load_balancer']) {
+          sh '''
+            export ANSIBLE_HOST_KEY_CHECKING=False
+            ansible-playbook -i ansible/inventory.ini ansible/lb.yml
+          '''
+        }
       }
     }
   }
