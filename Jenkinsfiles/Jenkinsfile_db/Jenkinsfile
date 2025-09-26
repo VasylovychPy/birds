@@ -12,6 +12,8 @@ pipeline {
     stage('Run Ansible') {
       steps {
         sh '''
+          ansible-galaxy collection install -r ansible/collections/requirements.yml --force
+          
           export ANSIBLE_HOST_KEY_CHECKING=False
           ansible-playbook -i ansible/inventory.ini ansible/db.yml \
             --limit db \
